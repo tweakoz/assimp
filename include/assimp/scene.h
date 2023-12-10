@@ -103,6 +103,7 @@ struct ASSIMP_API aiNode {
      *  @verbatim<DummyRootNode> @endverbatim.
      */
     C_STRUCT aiString mName;
+    C_STRUCT aiString mID;
 
     /** The transformation relative to the node's parent. */
     C_STRUCT aiMatrix4x4 mTransformation;

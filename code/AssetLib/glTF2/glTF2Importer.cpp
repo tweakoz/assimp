@@ -65,6 +65,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <rapidjson/document.h>
 #include <rapidjson/rapidjson.h>
+#include <deque>
 
 using namespace Assimp;
 using namespace glTF2;
@@ -1060,7 +1061,7 @@ aiNode *ImportNode(aiScene *pScene, glTF2::Asset &r, std::vector<unsigned int> &
     Node &node = *ptr;
 
     aiNode *ainode = new aiNode(GetNodeName(node));
-
+    ainode->mID = node.id;
     try {
         if (!node.children.empty()) {
             ainode->mNumChildren = unsigned(node.children.size());
@@ -1241,12 +1242,44 @@ struct AnimationSamplers {
     Animation::Sampler *weight;
 };
 
+///////////////////////////////////////////////////////////////////////////////
+using node_ref_t = Ref<Node>;
+using ainode_visitorfn_t = std::function<void(node_ref_t&, int depth)>;
+
+void _visit_ainodes_up(node_ref_t& node, int depth, ainode_visitorfn_t visitor){
+    visitor(node,depth);
+    if( node->parent){
+        _visit_ainodes_up(node->parent, depth+1, visitor);
+    }
+}
+std::deque<node_ref_t> _aiNodePath(node_ref_t& start_node){
+  std::deque<node_ref_t> node_path;
+  _visit_ainodes_up(start_node, 0, [&](node_ref_t& visited, int depth) {
+     node_path.push_front(visited);
+  });
+  return node_path;
+}
+std::string _aiNodePathName(node_ref_t& start_node){
+  auto node_path = _aiNodePath(start_node);
+  std::string node_path_name;
+  for (auto n : node_path) {
+      node_path_name += "/";
+      node_path_name += GetNodeName(*n);
+  }
+  return node_path_name;
+}
+
 aiNodeAnim *CreateNodeAnim(glTF2::Asset &, Node &node, AnimationSamplers &samplers) {
     aiNodeAnim *anim = new aiNodeAnim();
 
     try {
         anim->mNodeName = GetNodeName(node);
-
+        std::vector<Node *> nvec = { &node };
+        node_ref_t nref(nvec,0);
+        auto path = _aiNodePathName(nref);
+        printf( "GLTFNODENAME<%s>\n", anim->mNodeName.C_Str() );
+        printf( "GLTFNODEPATH<%s>\n", path.c_str() );
+        printf( "GLTFNODEID<%s>\n", node.id.c_str() );
         static const float kMillisecondsFromSeconds = 1000.f;
 
         if (samplers.translation && samplers.translation->input && samplers.translation->output) {
